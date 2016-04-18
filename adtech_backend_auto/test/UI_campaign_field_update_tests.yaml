@@ -1,0 +1,466 @@
+---
+- config:
+    - testset: "Campaign fields update tests."
+    - timeout: 40
+    - variable_binds: {base_url : "http://seller.stg.company.com/api"}
+    - generators:
+        - 'i' : {type: 'random_int'}
+
+- test: # login as admin
+    - step : True
+    - group: "login tests"
+    - name: "logs in as admin using regular login and extracts admin authkey"
+    - url: {template : "$base_url/admin/login"}
+    - method: "POST"
+    - body: {template : '{"email":"admin@company.com","password":"123456"}'}
+    - headers: {Content-Type: application/json}
+    - expected_status: [200]
+    - extract_binds:
+        - 'admin_authkey': {'jsonpath_mini': 'data.auth_key'}
+    - validators:
+        - json_schema: {schema: {file: 'schemas/login_schema.json'}}
+
+- test: # login as admin
+    - step : True
+    - group: "login tests"
+    - name: "generates auth token for a seller by using admin's authKey"
+    - url: {template : "$base_url/usertoken/generate?email=seller1@company.com"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $admin_authkey}}
+    - expected_status: [200]
+    - extract_binds:
+        - 'authkey': {'jsonpath_mini': 'data.auth_key'}
+    - validators:
+        - json_schema: {schema: {file: 'schemas/login_schema.json'}}
+
+- test: # call usertoken api
+    - step : True
+    - group: "login tests"
+    - name: "verifies usertoken apis response and extracts authKey, user_id, accountId and sellerCode"
+    - url: {template : "$base_url/usertoken"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - extract_binds:
+        - 'authkey': {'jsonpath_mini': 'data.auth_key'}
+        - 'id' : {'jsonpath_mini': 'data.user_id'}
+        - 'accId' : {'jsonpath_mini' : 'data.user_permissions.0.accountId'}
+        - 'sellerCode' : {'jsonpath_mini' : 'data.user_permissions.0.sellerCode'}
+    - validators:
+        - json_schema: {schema: {file: 'schemas/login_schema.json'}}
+
+#------------------------------------------------------------------------------------------------
+- test:
+    - step: True
+    - group: "Campaign Tests"
+    - name: "Create Campaign for testing campaign update and status changes with live and instock product and extracts campaignId"
+    - url: {template : "$base_url/campaigns?accountId=$accId"}
+    - method: "POST"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"type":"product","campaign_metrics":"CPC"}'}
+    - expected_status: [200]
+    - extract_binds:
+        - 'cmpId2' : {'jsonpath_mini': 'data.id'}
+    - validators:
+        - json_schema: {schema: {file: 'schemas/create_campaign_res.json'}}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validates the value of campaign_metrics of campaign just created from the DB is CPC"
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20campaign_metrics%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "CPC"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validates the default value of price_unit of campaign just created from the DB is 2.0"
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20price_unit%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "2000000.0"}
+
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates Campaign2 adds one product which is 'in stock and live' and verifies it in the response"
+    - url: {template : "$base_url/campaigns"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"agency_id":-1, "id":$cmpId2, "product_infos":[{"supc":"BOK046068410","sellerCode":"b56f58","name":"my book2","pogId":1049482124,"sellerName":"companyDisplay","price":3592,"inventory":9886,"offerPrice":2928,"live":true,"imgs":["http://sdstg.s3.amazonaws.com/imgs/a/a/c/BOK046068410_1376489717_image1-92b5b.jpg","http://sdstg.s3.amazonaws.com/imgs/a/a/c/BOK046068410_1376489717_image2-a6a09.jpg"],"pageUrl":"product/my-book2/1049482124","category":"books-arts","nodePath":null,"sdplus":false,"shippingDays":0,"productDesc":null,"rating":3.4,"noOfRating":11,"discount":17,"soldOut":false,"brand":"samsung","adCreated":false,"attributes":[{"name":"Binding","value":"Spiral"},{"name":"Copy","value":"Hard"}],"sellerCashbackComponent":0,"companyCashbackComponent":0,"cat1":null,"status":"Live","pageLink":"http://www.company.com/product/my-book2/1049482124","imageLink":"https://sdstg.s3.amazonaws.com/imgs/a/a/c/BOK046068410_1376489717_image1-92b5b.jpg","displayName":"my book2","skuCode":"SKU23455","selected":true,"notLive":false}]}'}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/create_campaign_res.json'}}
+        - compare : {jsonpath_mini : "data.product_infos.0.supc", comparator : "eq", expected : "BOK046068410"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of Campaign2's creatives and validates that creatives' status is 'draft, 200'"
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "200"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates Campaign2 by setting total_budget and validates the set field in response"
+    - url: {template : "$base_url/campaigns"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"agency_id":-1, "id":$cmpId2,"total_budget":"10000"}'}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/create_campaign_res.json'}}
+        - compare : {jsonpath_mini : "data.total_budget", comparator : "eq", expected : "10000.0"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validates the value of total_budget of campaign from the DB."
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20total_budget%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "10000.0"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of Campaign2's creatives and validates that creatives' status is 'draft, 200' after updating the total_budget of the campaign."
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "200"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates Campaign2 by setting daily_budget and validates the set field in response"
+    - url: {template : "$base_url/campaigns"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"agency_id":-1, "id":$cmpId2,"daily_budget":"10"}'}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/create_campaign_res.json'}}
+        - compare : {jsonpath_mini : "data.daily_budget", comparator : "eq", expected : "10.0"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validates the value of daily_budget of campaign from the DB."
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20campaign_daily_budget%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "10.0"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of Campaign2's creatives and validates that creatives' status is 'draft, 200' after updating the daily_budget of the campaign."
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "200"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates Campaign2 by setting price_unit and validates the set field in response"
+    - url: {template : "$base_url/campaigns"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"agency_id":-1, "id":$cmpId2,"price_unit":"3"}'}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/create_campaign_res.json'}}
+        - compare : {jsonpath_mini : "data.price_unit", comparator : "eq", expected : "3.0"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validates the updated value of price_unit of campaign from the DB is 3.0"
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20price_unit%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "3000000.0"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of Campaign2's creatives and validates that creatives' status is 'draft, 200' after updating the price_unit of the campaign."
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "200"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates Campaign2 by setting price_unit to less than minimum (< 2) and validates that error is returned."
+    - url: {template : "$base_url/campaigns"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"agency_id":-1, "id":$cmpId2,"price_unit":"1.9"}'}
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini : "status", comparator : "eq", expected : "CPC must be greater than 2"}
+        - compare : {jsonpath_mini : "code", comparator : "eq", expected : "500"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validates the updated value of price_unit of campaign after failing to update it to < 2. Value is last successfully updated value (3)"
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20price_unit%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "3000000.0"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of Campaign2's creatives and validates that creatives' status is 'draft, 200' after failing to update the price_unit of the campaign."
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "200"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates Campaign2 by adding Location_targeting and validates the set field in the response"
+    - url: {template : "$base_url/campaigns"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"agency_id":-1, "id":$cmpId2,"target_locations":[{"country":"IN","region":"Arunachal Pradesh","city":"Hong"},{"country":"IN","region":"Arunachal Pradesh","city":"Itanagar"}]}'}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/create_campaign_res.json'}}
+        - compare : {jsonpath_mini : "data.target_locations.0.city", comparator : "eq", expected : "Hong"}
+        - compare : {jsonpath_mini : "data.target_locations.1.city", comparator : "eq", expected : "Itanagar"}
+        - compare : {jsonpath_mini : "data.target_locations.0.region", comparator : "eq", expected : "Arunachal Pradesh"}
+        - compare : {jsonpath_mini : "data.target_locations.0.country", comparator : "eq", expected : "IN"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validated the value of target_location of campaign just created from the DB."
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20target_location%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - headers: {'template': {Content-Type: application/json}}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "success", comparator: "eq", expected: "True"}
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "[{\"country\":\"IN\",\"region\":\"Arunachal Pradesh\",\"city\":\"Hong\"},{\"country\":\"IN\",\"region\":\"Arunachal Pradesh\",\"city\":\"Itanagar\"}]"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of Campaign2's creatives and validates that creatives' status is 'draft, 200' after updating the target_locations of the campaign."
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "200"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates Campaign2 by adding Category_targeting and validates the set field in the response"
+    - url: {template : "$base_url/campaigns"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"agency_id":-1, "id":$cmpId2,"target_categories":["mobiles","mobiles-led","mobiles-value-added-services","mobiles-o2ochildlabel","mobiles-multi-sim","mobiles-bundling","mobiles-dualsim","mobiles-dualsim-phones","mobiles-cases-covers","mobiles-screen-guards"]}'}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/create_campaign_res.json'}}
+        - compare : {jsonpath_mini : "data.target_categories.0", comparator : "eq", expected : "mobiles"}
+        - compare : {jsonpath_mini : "data.target_categories.1", comparator : "eq", expected : "mobiles-led"}
+        - compare : {jsonpath_mini : "data.target_categories.2", comparator : "eq", expected : "mobiles-value-added-services"}
+        - compare : {jsonpath_mini : "data.target_categories.9", comparator : "eq", expected : "mobiles-screen-guards"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validated the value of target_categories of campaign just created from the DB."
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20target_categories%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - headers: {'template': {Content-Type: application/json}}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "success", comparator: "eq", expected: "True"}
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "mobiles,mobiles-led,mobiles-value-added-services,mobiles-o2ochildlabel,mobiles-multi-sim,mobiles-bundling,mobiles-dualsim,mobiles-dualsim-phones,mobiles-cases-covers,mobiles-screen-guards"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of Campaign2's creatives and validates that creatives' status is 'draft, 200' after updating the target_categories of the campaign."
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "200"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "200"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates Campaign status from draft to active and verifies that status changes"
+    - url: {template : "$base_url/campaigns/status"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"campaignIds":[$cmpId2],"status":"active"}'}
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "success"}
+        - compare : {jsonpath_mini : "data.0.campaignStatus", comparator : "eq", expected : "active"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of Campaign2's creatives and validates that creatives' status is 'active, 100' after activating the Campaign."
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "100"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates active Campaign2 by setting total_budget and validates the set field in response"
+    - url: {template : "$base_url/campaigns"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"agency_id":-1, "id":$cmpId2,"total_budget":"15000"}'}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/create_campaign_res.json'}}
+        - compare : {jsonpath_mini : "data.total_budget", comparator : "eq", expected : "15000.0"}
+        - compare : {jsonpath_mini : "data.audit_status", comparator : "eq", expected : "active"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validates the updated value of total_budget of active campaign from the DB."
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20total_budget%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "15000.0"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of active Campaign2's creatives and validates that creatives' status is 'active, 100' after updating the total_budget of the active campaign."
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "100"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Updates active Campaign2 by setting daily_budget and validates the set field in response"
+    - url: {template : "$base_url/campaigns"}
+    - method: "PUT"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - body: {'template': '{"user_id":$id,"agency_id":-1, "id":$cmpId2,"daily_budget":"15"}'}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/create_campaign_res.json'}}
+        - compare : {jsonpath_mini : "data.daily_budget", comparator : "eq", expected : "15.0"}
+        - compare : {jsonpath_mini : "data.audit_status", comparator : "eq", expected : "active"}
+
+- test:
+    - group: "Campaign Tests"
+    - name: "Validates the updated value of daily_budget of active campaign from the DB."
+    - url: {template : "http://localhost:9191/adserver/getValue?query=select%20campaign_daily_budget%20from%20adtech_dsp.campaigns%20where%20campaign_id%20=%20$cmpId2"}
+    - method: "GET"
+    - expected_status: [200]
+    - validators:
+        - compare : {jsonpath_mini: "value", comparator: "eq", expected: "15.0"}
+
+- test:
+    - delay: 2
+    - group: "Campaign Tests"
+    - name: "Gets list of active Campaign2's creatives and validates that creatives' status is 'active, 100' after updating the daily_budget of the active campaign."
+    - url: {template : "$base_url/creatives/list?campaignId=$cmpId2"}
+    - method: "GET"
+    - headers: {'template': {Content-Type: application/json, X-SD-AD-TOKEN: $authkey}}
+    - expected_status: [200]
+    - validators:
+        - json_schema: {schema: {file: 'schemas/creative_list.json'}}
+        - compare : {jsonpath_mini : "data.0.status", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.1.status", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.2.status", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.0.substatus", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.1.substatus", comparator : "eq", expected : "100"}
+        - compare : {jsonpath_mini : "data.2.substatus", comparator : "eq", expected : "100"}
+
+- test:
+    - step : True
+    - group : "CleanUp"
+    - name : "Cleaning campaign"
+    - url : {template : "http://localhost:9191/adserver/cleanCampaign?cmpId=$cmpId2"}
+    - method: "GET"
+    - expected_status : [200]

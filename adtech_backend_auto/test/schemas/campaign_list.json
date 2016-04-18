@@ -1,0 +1,143 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "id": "http://company.com",
+  "type": "object",
+  "properties": {
+    "code": {
+      "id": "http://company.com/code",
+      "type": "string"
+    },
+    "data": {
+      "id": "http://company.com/data",
+      "type": "array",
+      "items": [
+        {
+          "id": "http://company.com/data/0",
+          "type": "object",
+          "properties": {
+            "campaignId": {
+              "id": "http://company.com/data/0/campaignId",
+              "type": "number"
+            },
+            "campaignName": {
+              "id": "http://company.com/data/0/campaignName",
+              "type": "string"
+            },
+            "status": {
+              "id": "http://company.com/data/0/status",
+              "type": "string"
+            },
+            "impressions": {
+              "id": "http://company.com/data/0/impressions",
+              "type": "number"
+            },
+            "clicks": {
+              "id": "http://company.com/data/0/clicks",
+              "type": "number"
+            },
+            "conversions": {
+              "id": "http://company.com/data/0/conversions",
+              "type": "number"
+            },
+            "costOfInventory": {
+              "id": "http://company.com/data/0/costOfInventory",
+              "type": "number"
+            },
+            "numberOfOrders": {
+              "id": "http://company.com/data/0/numberOfOrders",
+              "type": "number"
+            },
+            "gmv": {
+              "id": "http://company.com/data/0/gmv",
+              "type": "number"
+            },
+            "cpa": {
+              "id": "http://company.com/data/0/cpa",
+              "type": "number"
+            },
+            "roi": {
+              "id": "http://company.com/data/0/roi",
+              "type": "number"
+            },
+            "budget": {
+              "id": "http://company.com/data/0/budget",
+              "type": "number"
+            },
+            "amountSpent": {
+              "id": "http://company.com/data/0/amountSpent",
+              "type": "number"
+            },
+            "cpc": {
+              "id": "http://company.com/data/0/cpc",
+              "type": "number"
+            },
+            "hidden": {
+              "id": "http://company.com/data/0/hidden",
+              "type": "boolean"
+            },
+            "productInfos": {
+              "id": "http://company.com/data/0/productInfos",
+              "type": "array",
+              "items": {
+                "id": "http://company.com/data/0/productInfos/0",
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "id": "http://company.com/data/0/productInfos/0/name",
+                    "type": "string"
+                  },
+                  "supc": {
+                    "id": "http://company.com/data/0/productInfos/0/supc",
+                    "type": "string"
+                  },
+                  "url": {
+                    "id": "http://company.com/data/0/productInfos/0/url",
+                    "type": "string"
+                  },
+                  "image": {
+                    "id": "http://company.com/data/0/productInfos/0/image",
+                    "type": "string"
+                  },
+                  "inventory": {
+                    "id": "http://company.com/data/0/productInfos/0/inventory",
+                    "type": "number"
+                  },
+                  "price": {
+                    "id": "http://company.com/data/0/productInfos/0/price",
+                    "type": "number"
+                  },
+                  "category": {
+                    "id": "http://company.com/data/0/productInfos/0/category",
+                    "type": "null"
+                  },
+                  "brand": {
+                    "id": "http://company.com/data/0/productInfos/0/brand",
+                    "type": "string"
+                  },
+                  "soldOut": {
+                    "id": "http://company.com/data/0/productInfos/0/soldOut",
+                    "type": "boolean"
+                  },
+                  "status": {
+                    "id": "http://company.com/data/0/productInfos/0/status",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "additionalItems": false
+      ]
+    },
+    "status": {
+      "id": "http://company.com/status",
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "data",
+    "status"
+  ]
+}

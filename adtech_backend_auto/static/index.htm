@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title></title>
+
+  <link rel="stylesheet" href="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+  <script src="http://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+    
+  <link rel="stylesheet" type="text/css" href="index.css">
+	<script type="text/javascript" src="index.js"></script>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+</head>
+<body onload="loadFiles()">
+
+
+  <div class="container">
+    <h2>AdTech API Automation</h2>
+    <div class="overallStatus">
+    <select id="files" class="files"></select><input type="submit" id="runButton" value="RUN TESTS" class="runButton" onclick= "loadTestResult()" />
+    <span class = "resultsummary">
+    Pass : <span class="passed" id="passCount">0</span> Fail : <span class ="failed" id="failCount">0</span> Warn : <span class = "warning" id="warnCount">0</span>
+    </span>
+    </div>
+        <table id="table">
+          <thead>
+            <tr>
+              <th>Test Group</th>
+              <th>Test Name</th>
+              <th>Response Status</th>
+              <th>Status</th>
+              <th>Comment</th>
+            </tr>
+          </thead>
+          <tbody id="trTable">
+          </tbody>
+        </table>
+  </div>
+</body>
+</html>
