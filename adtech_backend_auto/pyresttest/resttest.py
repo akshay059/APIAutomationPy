@@ -817,8 +817,8 @@ class RestTest:
                         has_registry = True
 
             if not has_registry:
-                raise ImportError(
-                    "Extension to register did not contain any registries: {0}".format(ext))    
+                self.logger.debug('Extension to register did not contain any registries: {0}'.format(ext))
+                #raise ImportError("Extension to register did not contain any registries: {0}".format(ext))
 
     def main(self, args):
         """
@@ -864,7 +864,7 @@ class RestTest:
             base_url = ''
 
         tests = self.parse_testsets(base_url, test_structure,
-                               working_directory=os.path.dirname(test_file), vars=my_vars)
+                               working_directory=os.path.dirname(test_file), vars=my_vars, test_files=set())
 
         # Override configs from command line if config set
         for t in tests:
