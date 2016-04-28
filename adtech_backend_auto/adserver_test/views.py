@@ -10,7 +10,7 @@ from dbaccess import dbActions
 #lock = threading.RLock()
 
 def results(request):
-	from pyresttest import resttest
+	from pyresttest.resttest import RestTest
 	params = request.GET
 	test_groups = []
 
@@ -18,7 +18,7 @@ def results(request):
 		test_file = params['file']
 		#lock.acquire()
 		try:
-			test_groups = resttest.RestTest().main({"url":"", "test":test_file, "absolute_urls" : True, "log" : "debug", "ssl_insecure" : True}).items()
+			test_groups = RestTest().main({"url":"", "test":test_file, "absolute_urls" : True, "log" : "debug", "interactive": False, "ssl_insecure" : True}).items()
 		finally:
 			pass
 			#lock.release()
@@ -69,6 +69,7 @@ def fileList(request):
 		from os import listdir
 		from os.path import isfile, join
 		onlyfiles = [join(mypath, f) for f in listdir(mypath) if isfile(join(mypath, f))]
+		onlyfiles = sorted(onlyfiles)
 	except Exception as e:
 		print e
 		traceback.print_exc()
@@ -92,7 +93,7 @@ def cleanCampaign(request):
 	try:
 		dbActions.cleanUpCampaign(cmpId)
 	except:
-		return HttpResponseServerError("Clean up failed for the campaign.")
+		return HttpResponseServerError("{'success' : false}")
 	return HttpResponse("{'success' : true}")
 
 def getSpecificValueFromDB(request):

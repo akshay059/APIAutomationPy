@@ -51,6 +51,8 @@ function loadTestResult(){
           document.getElementById("passCount").innerText = data[data.length - 1].pass
           document.getElementById("warnCount").innerText = data[data.length - 1].warn
           document.getElementById("failCount").innerText = data[data.length - 1].fail
+
+          document.getElementById("totalCount").innerText = data[data.length - 1].fail + data[data.length - 1].pass + data[data.length - 1].warn + data[data.length - 1].passSteps + data[data.length - 1].warnSteps + data[data.length - 1].failSteps
         } else if (xhttp.readyState == 4){
           if (xhttp.responseText.length < 100)
             alert(xhttp.responseText)

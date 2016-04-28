@@ -121,5 +121,6 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = ( 
+      '/home/pankaj/workspace/adtech-automation/adtech_backend_auto/static',  
       'static',  
 )
