@@ -31,11 +31,22 @@ def results(request):
 		return HttpResponseBadRequest("File was not supplied in the input params.")
 	# execute automated tests and validate responses and generate result json
 	passSteps = warnSteps = failSteps = passCount = warnCount = failCount = 0
+
+
+	import junit_xml as jx
 	try:
 		res = []
+		testSuites = []
 		for test_group in test_groups:
 			group_name = test_group[0]
+			tests = []
 			for test in test_group[1]:
+				if not test.step:
+					testCase = jx.TestCase(test.test.name, test.test._url, 0, test.body)
+					if not test.passed:
+						testCase.add_failure_info(output = str(test.failures[0].message))
+					tests.append(testCase)
+
 				if test.passed:
 					res.append({"passed": "passed", "name" : test.test.name, "group" : group_name, "response_code": test.response_code, "step": test.step})
 					if not test.step:
@@ -55,13 +66,19 @@ def results(request):
 							failCount += 1;
 						else :
 							failSteps += 1
+
+			testSuites.append(jx.TestSuite(group_name, tests))
 		res.append({"pass" : passCount, "warn": warnCount, "fail": failCount, "passSteps" : passSteps, "warnSteps": warnSteps, "failSteps": failSteps})
 	except Exception as e:
 		print e
 		traceback.print_exc()
 		return HttpResponseServerError("Some unknown error occured, please verify that test file is correctly structured or not.")
-		
-	return HttpResponse(json.dumps(res)) # return results as json string.
+
+	if params['format'] == 'json':
+		return HttpResponse(json.dumps(res)) # return results as json string.
+	elif params['format'] == 'xml':
+		return HttpResponse(jx.TestSuite.to_xml_string(testSuites))
+
 
 def fileList(request):
 	mypath = request.GET["path"]
@@ -92,6 +109,14 @@ def cleanCampaign(request):
 	cmpId = request.GET["cmpId"]
 	try:
 		dbActions.cleanUpCampaign(cmpId)
+	except:
+		return HttpResponseServerError("{'success' : false}")
+	return HttpResponse("{'success' : true}")
+
+def cleanSeller(request):
+	aId = request.GET["aId"]
+	try:
+		dbActions.cleanUpSeller(aId)
 	except:
 		return HttpResponseServerError("{'success' : false}")
 	return HttpResponse("{'success' : true}")

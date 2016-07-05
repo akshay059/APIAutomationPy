@@ -6,7 +6,7 @@ function loadTestResult(){
   runButton.value = "Running tests..."
   runButton.onclick = null
   var xhttp = new XMLHttpRequest()
-  xhttp.open("GET", "/adserver/runTest?file="+file)
+  xhttp.open("GET", "/adserver/runTest?format=json&file="+file)
   var tBody = document.getElementById("trTable")
   tBody.innerHTML = '';
       xhttp.onreadystatechange = function() {
